@@ -1,0 +1,38 @@
+name = "default"
+convergence_tol = 0.0001  # relative-change threshold for early stop
+
+# Each [[step]] is one fitting operation. Steps run in order;
+# the pipeline repeats for config.iterations (or until convergence).
+#
+# Step-level overrides (optional, fallback to config when absent):
+#   freq_ranges   — list of [lo, hi] in Hz (freq/offset steps)
+#   offset_ranges — list of [lo, hi] in um (offset steps; fwhm ignores this)
+#   freq_offset   — Hz (offset steps only)
+
+[[step]]  # fit beam spot size via FWHM of offset scan
+name = "spot_x"                 # human-readable step label
+fitter = "fwhm"                 # "fwhm" | "freq" | "offset"
+data_key = "offset_x_amplitude" # logical X offset amplitude
+target_names = ["spot_x"]       # model parameters to fit
+
+[[step]]  # fit beam spot size via FWHM of offset scan
+name = "spot_y"                 # human-readable step label
+fitter = "fwhm"                 # "fwhm" | "freq" | "offset"
+data_key = "offset_y_amplitude" # logical Y offset amplitude
+target_names = ["spot_y"]       # model parameters to fit
+
+[[step]]  # fit parameters from beam-offset scan
+name = "sr"                     # human-readable step label
+fitter = "offset"               # "fwhm" | "freq" | "offset"
+signal = "phase"                # "phase" | "amplitude"
+data_key = "offset_x_phase"     # logical X offset phase
+target_names = ["Sr_2"]         # model parameters to fit
+spot_key = "spot_x"             # which spot-size variable to use
+
+[[step]]  # fit parameters from frequency-sweep data
+name = "sz_tbc"                 # human-readable step label
+fitter = "freq"                 # "fwhm" | "freq" | "offset"
+signal = "phase"                # "phase" | "amplitude"
+data_key = "freq_phase"         # frequency-sweep phase
+target_names = ["Sz_2", "TBC_1"] # model parameters to fit
+spot_key = "spot_size"          # which spot-size variable to use

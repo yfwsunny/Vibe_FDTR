@@ -1,0 +1,104 @@
+# Full FDTR configuration reference.
+# This file is intentionally verbose and is meant for humans writing TOML by hand.
+# Generated task configs should usually be lean: run `fdtr init-config` without
+# `--full-template`, then edit only the fields needed for the task.
+
+temperature = 295.15              # K, sample temperature used for material lookup.
+
+[[layer]]
+material = "Gold"                 # Material library key. Library values are used unless fields below are explicit.
+rho_cp = 2482947.956055977        # J/m³K, volumetric heat capacity.
+Sr = 317.4258048688991            # W/mK, in-plane thermal conductivity.
+Sz = 317.4258048688991            # W/mK, cross-plane thermal conductivity.
+d = 4.8e-08                       # m, layer thickness.
+fit_d = [3.0e-08, 8.0e-08]        # m, optional fit bounds for layer thickness.
+fit_rho_cp = [2.0e6, 3.0e6]       # J/m³K, optional fit bounds for volumetric heat capacity.
+
+[[layer]]
+name = "TBC"                      # Interface layer. Use rho_cp = 0.0 and conductance in Sr/Sz.
+rho_cp = 0.0                      # J/m³K, 0.0 marks this as a TBC layer.
+Sr = 50000000.0                   # W/m²K, interface conductance.
+Sz = 50000000.0                   # W/m²K, interface conductance.
+d = 1.0                           # m, placeholder for TBC layers.
+fit_TBC = [5000000.0, 500000000.0] # W/m²K, TBC fit bounds.
+
+[[layer]]
+material = "BN"
+rho_cp = 1877762.1993912887       # J/m³K.
+Sr = 400.0                        # W/mK.
+Sz = 4.0                          # W/mK.
+d = 1.0e-07                       # m.
+fit_Sr = [50.0, 1000.0]           # W/mK, in-plane conductivity fit bounds.
+fit_Sz = [0.5, 20.0]              # W/mK, cross-plane conductivity fit bounds.
+# To model this layer as isotropic, replace Sr/Sz with S = <value>, then use fit_S.
+
+[[layer]]
+name = "TBC"
+rho_cp = 0.0
+Sr = 50000000.0
+Sz = 50000000.0
+d = 1.0
+fit_TBC = [5000000.0, 500000000.0]
+
+[[layer]]
+material = "Graphite"
+rho_cp = 1581191.3332213643
+Sr = 1727.7234719799992
+Sz = 5.766995629947655
+d = 1.0                           # m, use 1.0 for a semi-infinite substrate.
+fit_Sr = [100.0, 10000.0]
+fit_Sz = [0.6, 60.0]
+# To model this substrate as isotropic, replace Sr/Sz with S = <value>, then use fit_S.
+
+[paths]
+# Prefer `scan-data --group ... --save` followed by `init-config --paths-spec`.
+# These fields are shown for manual TOML authors and advanced overrides.
+offset_dir = "data/offset_x"       # Directory containing logical-X offset scan files.
+offset_dir_y = "data/offset_y"     # Optional directory containing logical-Y offset scan files.
+phase_dir = "data/frequency"       # Directory containing frequency-sweep files.
+data_file = "data/offset_x/file.txt" # Single logical-X offset scan file.
+data_file_y = "data/offset_y/file.txt" # Single logical-Y offset scan file.
+offset_pattern = "*xscan*"         # Glob for logical-X offset files. Use "*yscan*" to map YScan files to logical X.
+offset_pattern_y = "*yscan*"       # Glob for logical-Y offset files. Use "*xscan*" when swapping X/Y.
+phase_pattern = "*image*"          # Glob for selecting frequency-sweep files under phase_dir.
+offset_files = ["x1.txt", "x2.txt"] # Explicit logical-X offset file list.
+offset_files_y = ["y1.txt", "y2.txt"] # Explicit logical-Y offset file list.
+phase_files = ["f1.txt", "f2.txt"] # Explicit frequency-sweep file list.
+output_dir = "results"             # Runtime output directory override.
+
+[fit]
+strategy = "iterfit"               # One of: freqfit, offsetfit, spotfit, iterfit.
+pipeline = "default"               # Iterfit pipeline name or custom pipeline TOML path.
+signal = "phase"                   # phase or amplitude for supported strategies.
+spot_size = 3.0                    # um, beam 1/e² radius or initial guess.
+fit_spot_size = [0.3, 30.0]        # um, circular spot-size fit bounds.
+fit_spot_x = [0.3, 30.0]           # um, X-direction spot fit bounds.
+fit_spot_y = [0.3, 30.0]           # um, Y-direction spot fit bounds.
+iterations = 6                     # Iterfit loop count.
+freq_spot = 50000000.0             # Hz, offset-scan frequency used for spot fitting.
+freq_offset = 1194000.0            # Hz, offset-scan frequency used for Sr fitting.
+offset_points = 100                # Resampled offset points.
+phase_points = 80                  # Resampled frequency-sweep points.
+average = true                     # Average multiple files before fitting.
+freq_ranges = [[5e4, 2e7]]         # Hz, frequency intervals.
+offset_ranges = [[-15, -5], [5, 15]] # um, offset intervals.
+
+[[fit.targets]]
+name = "Sr_2"                      # Parameter name using 0-based layer indexing.
+bounds = [50.0, 1000.0]            # W/mK, fit bounds for this target.
+guess = 400.0                      # W/mK, optional initial guess.
+
+[[fit.targets]]
+name = "TBC_1"
+bounds = [5000000.0, 500000000.0]  # W/m²K
+
+[sensitivity]
+parameters = ["all"]               # Sensitivity parameters. Use ["all"] or explicit names.
+delta = 1.0e-04                    # Relative finite-difference step.
+output_dir = "sensitivity"         # Optional sensitivity output directory.
+
+[uncertainty]
+target_params = ["Sz_4", "TBC_1"]  # Parameters whose uncertainty should be estimated.
+known_params = {spot_size = 0.03, d_0 = 0.05} # Relative uncertainty by known parameter.
+fit_result = "fit_result.json"     # Optional fit result JSON.
+full_output = false                # Save expanded uncertainty output, including covariance and parameter breakdown.

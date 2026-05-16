@@ -1,0 +1,36 @@
+[project]
+name = "fdtr-toolkit"
+version = "0.3.0"
+description = "FDTR (Frequency Domain Thermoreflectance) data processing toolkit with AI agent skills"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "yfwsunny" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+]
+
+[project.scripts]
+fdtr = "fdtr.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fdtr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

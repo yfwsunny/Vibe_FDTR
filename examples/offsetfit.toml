@@ -1,0 +1,28 @@
+temperature = 295.15              # K
+
+[[layer]]
+material = "Gold"
+rho_cp = 2482947.956055977        # J/m³K
+S = 317.4258048688991             # W/mK
+d = 4.8e-08                       # m
+
+[[layer]]
+name = "TBC"
+rho_cp = 0.0                      # J/m³K — 0.0 标识 TBC 界面层
+Sr = 50000000.0                   # W/m²K
+Sz = 50000000.0                   # W/m²K
+d = 1.0                           # m
+
+[[layer]]
+material = "Graphite"
+rho_cp = 1581191.3332213643       # J/m³K
+Sr = 1727.7234719799992           # W/mK
+Sz = 5.766995629947655            # W/mK
+d = 1.0                           # m
+fit_Sr = [100.0, 10000.0]         # W/mK
+
+[fit]
+strategy = "offsetfit"
+spot_size = 3.0                    # um — beam 1/e² radius
+offset_points = 100
+average = true

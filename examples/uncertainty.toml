@@ -1,0 +1,6 @@
+base_config = "iterfit.toml"
+strategy = "iterfit"
+fit_result = "fit_result.json"
+target_params = ["Sz_2", "TBC_1"]
+known_params = {spot_size = 0.03, d_0 = 0.05}
+full_output = false

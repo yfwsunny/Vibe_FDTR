@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Runtime output
+tasks/
+iterfit_*.png
+*.pdf
+test_*.toml
+*_output/
+*_sensitivity/
+
+# OS files
+.DS_Store
+Thumbs.db
