@@ -5,7 +5,6 @@ CLI built on argparse.  Provides subcommands for FDTR data fitting:
 
 - ``fit``           — run fitting via TOML config (``--config``)
 - ``init-config``   — generate template TOML config
-- ``init-pipeline`` — generate template pipeline TOML
 
 
 Usage::
@@ -28,26 +27,6 @@ from fdtr.cli.uncertainty import run_uncertainty
 from fdtr.cli.initconfig import run_init_config
 from fdtr.cli.materials_cmd import run_list_materials, run_show_material
 from fdtr.cli.summary import run_summary
-
-
-# ---------------------------------------------------------------------------
-# Argument helpers
-# ---------------------------------------------------------------------------
-
-
-def _add_output_dir_arg(sub: argparse.ArgumentParser) -> None:
-    """Add --output-dir argument to a subcommand parser."""
-    sub.add_argument(
-        "--output-dir",
-        metavar="PATH",
-        default=None,
-        help="Output directory (default: auto-timestamped under tasks/)",
-    )
-
-
-def _add_common_fit_args(sub: argparse.ArgumentParser) -> None:
-    """Add args shared by all strategies: output-dir."""
-    _add_output_dir_arg(sub)
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +57,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Path to TOML config file (required).",
     )
-    _add_common_fit_args(uf)
 
     # --- sensitivity subcommand ---
     sens = subparsers.add_parser(
@@ -94,7 +72,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Path to TOML config file (required).",
     )
-    _add_output_dir_arg(sens)
 
     # --- uncertainty subcommand ---
     unc = subparsers.add_parser(
@@ -116,18 +93,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to fit result JSON file (post-fit mode)",
     )
     unc.add_argument(
-        "--output", "-o",
-        type=str,
-        metavar="PATH",
-        help="Output file path for JSON result",
-    )
-    unc.add_argument(
         "--full-output",
         action="store_true",
         default=None,
         help="Include full output (covariance matrix, contributions)",
     )
-    _add_output_dir_arg(unc)
 
     # --- init-config subcommand ---
     ic = subparsers.add_parser(
@@ -137,25 +107,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     from fdtr.cli.initconfig_args import add_init_config_args
     add_init_config_args(ic)
-
-    # --- init-pipeline subcommand ---
-    ip = subparsers.add_parser(
-        "init-pipeline",
-        description="Generate a template pipeline TOML file for iterative fitting.",
-        help="Generate template pipeline file",
-    )
-    ip.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Output file path (default: prints to stdout)",
-    )
-    ip.add_argument(
-        "--config",
-        type=str,
-        default=None,
-        help="Optional config TOML for symmetry-aware default pipeline generation.",
-    )
 
     # --- scan-data subcommand ---
     sd = subparsers.add_parser(
@@ -180,12 +131,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Save per-group JSON for every discovered group plus a summary index",
-    )
-    sd.add_argument(
-        "--output",
-        type=Path,
-        default=None,
-        help="Write scan-data JSON to this file path",
     )
     sd.add_argument(
         "--detail-threshold",
@@ -265,7 +210,6 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         "sensitivity": run_sensitivity,
         "uncertainty": run_uncertainty,
         "init-config": run_init_config,
-        "init-pipeline": _run_init_pipeline,
         "list-materials": run_list_materials,
         "show-material": run_show_material,
         "scan-data": _run_scan_data,
@@ -276,25 +220,6 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         parser.print_help()
         sys.exit(1)
     handler(args)
-
-
-def _run_init_pipeline(args) -> None:
-    """Generate a template pipeline TOML."""
-    from fdtr.fit.iterfit import load_default_pipeline, resolve_pipeline_for_config, save_pipeline
-
-    if args.config:
-        from fdtr.input.config import from_toml
-
-        pipeline = resolve_pipeline_for_config(from_toml(args.config))
-    else:
-        pipeline = load_default_pipeline()
-    if args.output:
-        save_pipeline(pipeline, args.output)
-        print(f"Pipeline written to {args.output}")
-    else:
-        from fdtr.fit.iterfit.pipeline import _to_toml_string
-
-        print(_to_toml_string(pipeline))
 
 
 def _run_scan_data(args) -> None:
@@ -312,12 +237,6 @@ def _run_scan_data(args) -> None:
         detail_threshold=args.detail_threshold,
     )
     payload = json.dumps(result, indent=2, ensure_ascii=False)
-
-    if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(payload + "\n", encoding="utf-8")
-        print(f"Scan data written to {args.output}")
-        return
 
     if args.save_all and not args.group:
         full_result = scan_data_directory(

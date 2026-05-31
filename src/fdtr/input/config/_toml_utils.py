@@ -14,7 +14,7 @@ def fmt(value: object) -> str:
     if isinstance(value, float):
         return repr(value)
     if isinstance(value, str):
-        return json.dumps(value, ensure_ascii=False)
+        return json.dumps(value.replace("\\", "/"), ensure_ascii=False)
     raise TypeError(f"Unsupported TOML value type: {type(value)}")
 
 

@@ -14,6 +14,10 @@ from fdtr.input.config.config_dataclass import (
     UncertaintySpec,
     normalize_strategy,
 )
+from fdtr.input.config.unit_check import (
+    check_fit_config_units,
+    check_uncertainty_known_params,
+)
 from fdtr.model.layer import SYMMETRY_ISOTROPIC, SYMMETRY_TRANSVERSE
 
 
@@ -29,6 +33,9 @@ def from_toml(path: str | Path) -> FitConfig:
         data = tomllib.load(f)
     cfg = _from_dict(data)
     cfg.source_path = str(path)
+    check_fit_config_units(cfg, mode="warning")
+    if cfg.uncertainty is not None:
+        check_uncertainty_known_params(cfg.uncertainty.known_params, mode="warning")
     return cfg
 
 
@@ -145,6 +152,8 @@ def _from_dict(data: dict) -> FitConfig:
     raw_strategy = fit.get("strategy", cfg.strategy)
     cfg.strategy = normalize_strategy(raw_strategy)
     cfg.spot_size = fit.get("spot_size", None)
+    cfg.spot_x = fit.get("spot_x", None)
+    cfg.spot_y = fit.get("spot_y", None)
     cfg.iterations = fit.get("iterations", cfg.iterations)
     cfg.freq_spot = fit.get("freq_spot", cfg.freq_spot)
     cfg.freq_offset = fit.get("freq_offset", cfg.freq_offset)
@@ -211,11 +220,11 @@ _STRATEGY_SKIP: dict[str, frozenset[str]] = {
 
 
 def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
-    """Produce a TOML document string from *config* with unit annotations."""
+    """Produce a TOML document string from *config* with ASCII comments."""
     lines: list[str] = []
 
     # Temperature
-    lines.append(f"temperature = {_fmt(config.temperature)}              # K — 温度")
+    lines.append(f"temperature = {_fmt(config.temperature)}              # K, temperature")
     lines.append("")
 
     # Layers
@@ -224,37 +233,35 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
     for layer in config.layers:
         lines.append("[[layer]]")
         if layer.material is not None:
-            lines.append(f'material = {_fmt(layer.material)}            # 从材料库自动查找')
+            lines.append(f'material = {_fmt(layer.material)}            # material library name')
         elif layer.name:
             lines.append(f'name = {_fmt(layer.name)}')
         if layer.is_tbc:
-            lines.append(f"rho_cp = {_fmt(layer.rho_cp)}                  # J/m³K — 0.0 标识 TBC 界面层")
-            lines.append(f"Sr = {_fmt(layer.Sr)}                    # W/m²K")
-            lines.append(f"Sz = {_fmt(layer.Sz)}                    # W/m²K")
+            lines.append(f"rho_cp = {_fmt(layer.rho_cp)}                  # J/m^3K, 0.0 marks a TBC layer")
+            lines.append(f"Sr = {_fmt(layer.Sr)}                    # W/m^2K")
+            lines.append(f"Sz = {_fmt(layer.Sz)}                    # W/m^2K")
         else:
-            lines.append(f"rho_cp = {_fmt(layer.rho_cp)}              # J/m³K")
+            lines.append(f"rho_cp = {_fmt(layer.rho_cp)}              # J/m^3K")
             if layer.symmetry == SYMMETRY_ISOTROPIC:
                 lines.append(f"S = {_fmt(layer.Sr)}                     # W/mK")
             else:
                 lines.append(f"Sr = {_fmt(layer.Sr)}                    # W/mK")
                 lines.append(f"Sz = {_fmt(layer.Sz)}                    # W/mK")
         lines.append(f"d = {_fmt(layer.d)}                     # m")
-        # fit_<prop> bounds
         for prop, bounds in layer.fit_fields.items():
             toml_key = _PROP_TOML_KEY.get(prop, f"fit_{prop}")
             if prop == "TBC":
-                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/m²K — TBC 拟合 bounds")
+                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/m^2K, TBC fit bounds")
             elif prop == "S":
-                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/mK — 各向同性 S 拟合 bounds（Sr/Sz 同步）")
+                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/mK, isotropic S fit bounds")
             elif prop == "Sr":
-                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]     # W/mK — Sr 拟合 bounds")
+                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]     # W/mK, Sr fit bounds")
             elif prop == "Sz":
-                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/mK — Sz 拟合 bounds")
+                lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]      # W/mK, Sz fit bounds")
             else:
                 lines.append(f"{toml_key} = [{_fmt(bounds[0])}, {_fmt(bounds[1])}]")
         lines.append("")
 
-    # Paths -- always emit strategy-aware comments
     strategy = normalize_strategy(config.strategy)
     has_paths = any(
         v is not None
@@ -267,7 +274,7 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
 
     if mode == "full":
         lines.append("")
-        lines.append("# ── 数据路径（取消注释并填入实际路径） ──────────────────────────")
+        lines.append("# Data paths (uncomment and fill real paths)")
         if has_paths:
             lines.append("[paths]")
         else:
@@ -276,19 +283,19 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         if config.offset_dir is not None:
             lines.append(f"offset_dir = {_fmt(config.offset_dir)}")
         elif strategy in ("iterfit", "offsetfit"):
-            lines.append('# offset_dir = "path/to/offset/data"     # offset 扫描数据目录')
+            lines.append('# offset_dir = "path/to/offset/data"     # offset scan directory')
 
         if config.phase_dir is not None:
             lines.append(f"phase_dir = {_fmt(config.phase_dir)}")
         elif strategy in ("iterfit", "freqfit"):
-            lines.append('# phase_dir = "path/to/phase/data"       # 频率扫描数据目录')
+            lines.append('# phase_dir = "path/to/phase/data"       # frequency sweep directory')
 
         if config.data_file is not None:
             lines.append(f"data_file = {_fmt(config.data_file)}")
         elif strategy == "offsetfit":
-            lines.append('# data_file = "path/to/offset.txt"       # 单文件（备选）')
+            lines.append('# data_file = "path/to/offset.txt"       # single offset file')
         elif strategy == "spotfit":
-            lines.append('# data_file = "path/to/offset_scan.txt"  # offset 扫描数据文件')
+            lines.append('# data_file = "path/to/offset_scan.txt"  # offset scan file')
 
         if config.data_file_y is not None:
             lines.append(f"data_file_y = {_fmt(config.data_file_y)}")
@@ -299,7 +306,7 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         if config.offset_pattern is not None:
             lines.append(f"offset_pattern = {_fmt(config.offset_pattern)}")
         elif config.offset_dir is None:
-            lines.append('# offset_pattern = "*xscan*"    # 通配符选择 offset 文件（优先）')
+            lines.append('# offset_pattern = "*xscan*"    # glob for offset files')
 
         if config.offset_pattern_y is not None:
             lines.append(f"offset_pattern_y = {_fmt(config.offset_pattern_y)}")
@@ -307,12 +314,12 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         if config.phase_pattern is not None:
             lines.append(f"phase_pattern = {_fmt(config.phase_pattern)}")
         elif config.phase_dir is None:
-            lines.append('# phase_pattern = "*image*"      # 通配符选择 phase 文件')
+            lines.append('# phase_pattern = "*image*"      # glob for phase files')
 
         if config.offset_files is not None:
             lines.append(f"offset_files = {_fmt_list(config.offset_files)}")
         elif config.offset_dir is None:
-            lines.append('# offset_files = ["file1.txt", "file2.txt"]  # 显式文件列表（次之）')
+            lines.append('# offset_files = ["file1.txt", "file2.txt"]  # explicit offset files')
 
         if config.offset_files_y is not None:
             lines.append(f"offset_files_y = {_fmt_list(config.offset_files_y)}")
@@ -325,12 +332,11 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         if config.output_dir is not None:
             lines.append(f"output_dir = {_fmt(config.output_dir)}")
         else:
-            lines.append('# output_dir = "."    # 输出到 config 所在目录（默认留空即可）')
+            lines.append('# output_dir = "."    # optional; leave empty for auto output')
 
         if config.group_key is not None:
             lines.append(f"group_key = {_fmt(config.group_key)}")
     else:
-        # lean mode: only emit [paths] if has_paths
         if has_paths:
             lines.append("")
             lines.append("[paths]")
@@ -361,49 +367,50 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
             if config.group_key is not None:
                 lines.append(f"group_key = {_fmt(config.group_key)}")
 
-    # Fit section
     skip = _STRATEGY_SKIP.get(config.strategy, frozenset())
     lines.append("[fit]")
     lines.append(f"strategy = {_fmt(config.strategy)}")
     if config.pipeline is not None and "pipeline" not in skip:
-        lines.append(f"pipeline = {_fmt(config.pipeline)}           # pipeline 名称（default 或自定义 .toml 路径）")
+        lines.append(f"pipeline = {_fmt(config.pipeline)}           # builtin:<name> or .toml path")
     if config.spot_size is not None:
-        lines.append(f"spot_size = {_fmt(config.spot_size)}               # um — 光束 1/e² 半径（值 = 拟合初始猜测）")
-    # Spot-size fit bounds (new-style)
+        lines.append(f"spot_size = {_fmt(config.spot_size)}               # um, beam 1/e2 radius")
+    if config.spot_x is not None:
+        lines.append(f"spot_x = {_fmt(config.spot_x)}                  # um, fixed X spot radius")
+    if config.spot_y is not None:
+        lines.append(f"spot_y = {_fmt(config.spot_y)}                  # um, fixed Y spot radius")
     if config.fit_spot_size is not None:
         lines.append(
-            f"fit_spot_size = [{_fmt(config.fit_spot_size[0])}, {_fmt(config.fit_spot_size[1])}]  # um — 光斑拟合 bounds"
+            f"fit_spot_size = [{_fmt(config.fit_spot_size[0])}, {_fmt(config.fit_spot_size[1])}]  # um, spot fit bounds"
         )
     if config.fit_spot_x is not None:
         lines.append(
-            f"fit_spot_x = [{_fmt(config.fit_spot_x[0])}, {_fmt(config.fit_spot_x[1])}]      # um — X 方向光斑拟合 bounds"
+            f"fit_spot_x = [{_fmt(config.fit_spot_x[0])}, {_fmt(config.fit_spot_x[1])}]      # um, X spot fit bounds"
         )
     if config.fit_spot_y is not None:
         lines.append(
-            f"fit_spot_y = [{_fmt(config.fit_spot_y[0])}, {_fmt(config.fit_spot_y[1])}]      # um — Y 方向光斑拟合 bounds"
+            f"fit_spot_y = [{_fmt(config.fit_spot_y[0])}, {_fmt(config.fit_spot_y[1])}]      # um, Y spot fit bounds"
         )
         if config.fit_spot_x is not None and config.fit_spot_y is not None:
             if mode == "full":
-                lines.append("# 若不需分别拟合，可用 fit_spot_size 替代上面两行")
+                lines.append("# Use fit_spot_size instead if separate X/Y spot fits are not needed.")
     if "iterations" not in skip:
         lines.append(f"iterations = {_fmt(config.iterations)}")
     if "freq_spot" not in skip:
-        lines.append(f"freq_spot = {_fmt(config.freq_spot)}             # Hz — 光斑拟合用频率（最高频）")
+        lines.append(f"freq_spot = {_fmt(config.freq_spot)}             # Hz, spot-fit frequency")
     if "freq_offset" not in skip:
-        lines.append(f"freq_offset = {_fmt(config.freq_offset)}           # Hz — Sr 拟合用频率")
+        lines.append(f"freq_offset = {_fmt(config.freq_offset)}           # Hz, offset-fit frequency")
     if "offset_points" not in skip:
         lines.append(f"offset_points = {_fmt(config.offset_points)}")
     if "phase_points" not in skip:
         lines.append(f"phase_points = {_fmt(config.phase_points)}")
-    lines.append(f"average = {_fmt(config.average)}              # 多文件取平均拟合（设为 false 使用单文件）")
+    lines.append(f"average = {_fmt(config.average)}              # average multiple files")
     if config.signal != "phase" and "signal" not in skip:
         lines.append(f"signal = {_fmt(config.signal)}")
-    # Range examples
     has_any_range = (config.freq_ranges is not None or config.offset_ranges is not None)
     if not has_any_range and mode == "full":
-        lines.append("# 范围示例（单区间也写成单元素列表）")
-        lines.append("# freq_ranges = [[5e4, 2e7]]              # 频率范围 (Hz)")
-        lines.append("# offset_ranges = [[-15, 15]]             # 偏移范围 (um)")
+        lines.append("# Range examples (single interval is still a one-item list)")
+        lines.append("# freq_ranges = [[5e4, 2e7]]              # frequency range (Hz)")
+        lines.append("# offset_ranges = [[-15, 15]]             # offset range (um)")
     if config.freq_ranges is not None:
         ranges_str = ", ".join(
             f"[{_fmt(r[0])}, {_fmt(r[1])}]" for r in config.freq_ranges
@@ -415,7 +422,6 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         )
         lines.append(f"offset_ranges = [{ranges_str}]  # um")
 
-    # Targets
     for target in config.targets:
         lines.append("")
         lines.append("[[fit.targets]]")
@@ -448,9 +454,8 @@ def _to_toml_string(config: FitConfig, *, mode: str = "full") -> str:
         lines.append(f"full_output = {_fmt(config.uncertainty.full_output)}")
 
     lines = _normalize_toml_layout(lines)
-    lines.append("")  # trailing newline
+    lines.append("")
     return "\n".join(lines)
-
 
 def _normalize_toml_layout(lines: list[str]) -> list[str]:
     """Normalize blank lines so adjacent TOML sections have exactly one spacer."""

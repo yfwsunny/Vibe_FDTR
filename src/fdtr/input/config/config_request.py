@@ -59,6 +59,8 @@ class InitConfigRequest:
     phase_files: list[str] | None = None
 
     spot_size: float = 3.0
+    spot_x: float | None = None
+    spot_y: float | None = None
     freq_offset: float = 1.194e6
     freq_spot: float = 5.0e7
     signal: str = "phase"
@@ -72,7 +74,6 @@ class InitConfigRequest:
     pipeline: str | None = None
     iterations: int = 6
 
-    output: str | None = None
     output_dir: str | None = None
     report: bool = False
     full_template: bool = False

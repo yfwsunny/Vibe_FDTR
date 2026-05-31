@@ -43,7 +43,7 @@ class OffsetFitter:
         stack: MultilayerStack,
         signal: SignalType,
         freq: float,
-        spot_size_um: float,
+        spot_size_um: float | None,
         offset_ranges: List[tuple[float, float]],
         sep_um: float = 0.0,
         n_points: int = 100,
@@ -51,7 +51,13 @@ class OffsetFitter:
         self._stack = stack
         self._signal = signal
         self._freq = freq
-        self._spot_size_um = spot_size_um
+        if spot_size_um is None:
+            raise ValueError(
+                "spot_size_um is required for offsetfit. Set [fit] spot_size "
+                "in the config. Directional spot_x/spot_y are only used by "
+                "iterfit pipeline spot_key steps or directional spotfit."
+            )
+        self._spot_size_um = float(spot_size_um)
         self._offset_ranges = offset_ranges
         self._sep_um = sep_um
         self._n_points = n_points

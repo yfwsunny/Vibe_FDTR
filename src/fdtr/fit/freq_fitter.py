@@ -34,13 +34,19 @@ class FreqFitter:
         self,
         stack: MultilayerStack,
         signal: SignalType,
-        spot_size_um: float,
+        spot_size_um: float | None,
         freq_ranges: List[tuple[float, float]],
         n_points: int = 80,
     ) -> None:
         self._stack = stack
         self._signal = signal
-        self._spot_size_um = spot_size_um
+        if spot_size_um is None:
+            raise ValueError(
+                "spot_size_um is required for freqfit. Set [fit] spot_size "
+                "in the config. Directional spot_x/spot_y are only used by "
+                "iterfit pipeline spot_key steps or directional spotfit."
+            )
+        self._spot_size_um = float(spot_size_um)
         self._freq_ranges = freq_ranges
         self._n_points = n_points
 

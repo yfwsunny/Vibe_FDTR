@@ -36,7 +36,7 @@ Modulation frequencies are embedded in the second header line as `(NNNN Hz)`. Ea
 
 When multiple data files exist for the same experimental condition:
 
-- Set `average = true` in config `[paths]` section
+- Set `average = true` in config `[fit]` section
 - PCHIP interpolation averages files onto a common grid
 - Standard deviations computed for uncertainty estimation
 - Always average — never pick only one file when multiple exist

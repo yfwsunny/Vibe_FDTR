@@ -34,8 +34,8 @@ def load_pipeline_datasets(
         config: A :class:`FitConfig` providing data paths, frequencies, and
             data-selection settings.
         pipeline: Optional pre-loaded pipeline.  When *None*, the pipeline is
-            resolved from ``config.pipeline`` (path string, ``"default"``, or
-            ``None`` all fall back to the built-in default).
+            resolved from ``config.pipeline`` (path string, ``"builtin:default"``,
+            or ``None`` all fall back to the built-in default).
 
         Returns:
         Mapping of ``data_key -> (x_array, y_array)`` tuples:

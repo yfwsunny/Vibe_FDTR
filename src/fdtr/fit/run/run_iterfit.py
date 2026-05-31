@@ -23,6 +23,7 @@ from fdtr.output.fit_curve_cal import (
 from fdtr.fit.run.postfit import resolve_fit_output_paths, handle_fit_exit
 from fdtr.output.paths import OutputPaths
 from fdtr.input.config.path_resolution import resolve_config_path
+from fdtr.fit.iterfit.pipeline import is_builtin_pipeline_reference
 from fdtr.common_types import SignalType
 
 
@@ -217,7 +218,7 @@ def _plot_and_save_iter_results(
 
 def run_iterfit(config: FitConfig, args=None):
     """Execute iterative pipeline fitting: config -> load data -> pipeline run -> output."""
-    if config.pipeline and config.pipeline != "default":
+    if config.pipeline and not is_builtin_pipeline_reference(config.pipeline):
         pipeline_path = resolve_config_path(config, config.pipeline)
         print(f"Loading custom pipeline from: {pipeline_path}")
     pipeline = resolve_pipeline_for_config(config)

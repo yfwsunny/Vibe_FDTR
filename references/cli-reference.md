@@ -18,15 +18,8 @@ Agent-driven fits should use config-only invocation with auto-naming:
 uv run fdtr fit --config <config.toml>
 ```
 
-**Do not** pass `--output` or `--output-dir` unless the user explicitly requests a specific output path.
-
-### Manual Usage
-
-Human users or tutorials may pass `--output-dir` to override the runtime output location:
-
-```bash
-uv run fdtr fit --config <config.toml> --output-dir ./my_results
-```
+Do not pass output-path override flags. To intentionally change a task's output
+directory, edit the reviewed TOML config instead of adding CLI overrides.
 
 ## Analysis Commands
 
@@ -53,9 +46,8 @@ uv run fdtr fit --config <config.toml> --output-dir ./my_results
 |---|---|
 | `fdtr scan-data <dir>` | Index a data directory and emit grouped JSON |
 | `fdtr init-config --strategy <name>` | Generate a fit TOML template |
-| `fdtr init-pipeline [--config <toml>]` | Generate a pipeline TOML template; with config, targets are symmetry-aware |
-| `fdtr list-materials` | List materials in the library, including symmetry |
-| `fdtr show-material <name> -T <K>` | Show material properties and symmetry at temperature |
+| `fdtr list-materials` | List materials in the library |
+| `fdtr show-material <name> -T <K>` | Show material properties at temperature |
 
 ## scan-data Workflow
 
@@ -84,8 +76,7 @@ uv run fdtr init-config \
   --strategy iterfit \
   --transducer Gold \
   --substrate Graphite \
-  --paths-spec paths.json \
-  --output iterfit.toml
+  --paths-spec paths.json
 ```
 
 Alternative inline form:
@@ -95,11 +86,11 @@ uv run fdtr init-config \
   --strategy iterfit \
   --transducer Gold \
   --substrate Graphite \
-  --paths-json '{"group_key":"sample_a","offset_x":{"pattern":"*sample_a*xscan*"},"freq_sweep":{"pattern":"*sample_a*image*"}}' \
-  --output iterfit.toml
+  --paths-json '{"group_key":"sample_a","offset_x":{"pattern":"*sample_a*xscan*"},"freq_sweep":{"pattern":"*sample_a*image*"}}'
 ```
 
 Use `--paths-json` only for small manual or agent-generated edits. Prefer `--paths-spec` for normal workflow.
+`init-config` writes to an auto-generated task path and prints that path.
 
 ## init-config Analysis Templates
 
@@ -111,12 +102,11 @@ uv run fdtr init-config \
   --strategy iterfit \
   --transducer Gold \
   --substrate Graphite \
-  --paths-spec paths.json \
-  --output iterfit.toml
+  --paths-spec paths.json
 
 # Step 2: generate analysis configs from the base config
-uv run fdtr init-config --analysis sensitivity --base-config iterfit.toml --output sens.toml
-uv run fdtr init-config --analysis uncertainty --base-config iterfit.toml --output unc.toml
+uv run fdtr init-config --analysis sensitivity --base-config <printed-config-path>
+uv run fdtr init-config --analysis uncertainty --base-config <printed-config-path>
 ```
 
 For uncertainty templates, use:
@@ -154,16 +144,11 @@ Do not use `known_param`, `mode`, `offset_sweep`, `both`, or `contributions`.
 | `--paths-spec <file>` | Canonical file-based path spec |
 | `--paths-json <json>` | Inline path spec |
 | `--fit "Param_N=lo,hi"` | Fit bounds, repeatable |
-| `--output <path>` | Output TOML path |
 | `--report` | ~~Removed — use `fdtr summary` instead~~ |
 | `--full-template` | Emit the verbose reference-style template instead of the lean task template |
 
 Default `init-config` output is lean and task-oriented. It omits unset path
-stubs, default `average = true`, and commented range examples. Use `examples/config-full-template.toml` when a reader needs a single commented reference covering all currently supported TOML fields.
-
-Use `S = ...` in isotropic layer configs and `--fit "S_N=lo,hi"` when one
-fitted conductivity should remain coupled. Use `Sr`/`Sz` plus
-`Sr_N`/`Sz_N` only for anisotropic layers.
+stubs and commented range examples, but still emits `average = true`. Use `examples/config-full-template.toml` when a reader needs a single commented reference covering all currently supported TOML fields.
 
 ## init-config Range Flags
 
@@ -197,9 +182,9 @@ intervals. Agents should create them through repeatable `--freq-range` and
 |---|---|---|
 | `--config <toml>` | all fit and analysis commands | path to TOML config |
 | `--signal phase|amplitude` | `freqfit`, `offsetfit` | choose signal channel |
-| `--output-dir <path>` | manual usage only | override runtime output location |
-
 **Removed flags** (output is now always-on):
+- `--output-dir`: use config-level `output_dir` only when an explicit reviewed
+  output directory is required
 - `--report`: replaced by `fdtr summary <task_dir>`
 - `--no-plot`: plots are always saved to disk (Agg backend)
 

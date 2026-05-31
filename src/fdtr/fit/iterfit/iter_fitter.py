@@ -28,7 +28,7 @@ from fdtr.fit.fwhm_fitter import FWHMFitter
 from fdtr.fit.offset_fitter import OffsetFitter
 from fdtr.model.param import apply_params, validate_targets
 
-from .pipeline import PipelineSpec, StepSpec
+from .pipeline import PipelineSpec, StepSpec, validate_pipeline
 
 # Spot-related parameter names that should NOT be applied to layer properties.
 _SPOT_PARAM_NAMES = frozenset({"spot_size", "spot_x", "spot_y"})
@@ -123,9 +123,17 @@ class PipelineRunner:
         config = self._config
         from fdtr.input.config import to_stack as _to_stack
         stack = _to_stack(config)
-        default_spot = config.spot_size or 3.0
+        default_spot = config.spot_size or config.spot_x or config.spot_y or 3.0
 
-        params: Dict[str, float] = {}
+        # Validate pipeline before running
+        errors = validate_pipeline(self._pipeline, self._datasets, stack)
+        if errors:
+            raise ValueError(
+                "Pipeline validation failed:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+        params: Dict[str, float] = self._initial_spot_params(default_spot)
         history: List[Dict[str, float]] = []
         step_results: List[List[FitResult]] = []
         all_success = True
@@ -134,10 +142,6 @@ class PipelineRunner:
             iter_step_results: List[FitResult] = []
 
             for step in self._pipeline.steps:
-                # Skip steps whose data_key is not available
-                if step.data_key and step.data_key not in self._datasets:
-                    continue
-
                 targets = self._build_targets(step, params, stack)
 
                 if step.fitter == "fwhm":
@@ -169,7 +173,7 @@ class PipelineRunner:
             # If Y-direction data is unavailable, spot_y defaults to spot_x.
             spot_x = params.get("spot_x", params.get("spot_size", default_spot))
             has_y_data = "offset_y_amplitude" in self._datasets
-            if not has_y_data:
+            if not has_y_data and self._config.spot_y is None:
                 params["spot_y"] = spot_x
             spot_y = params.get("spot_y", spot_x)
             params["spot_size"] = (spot_x + spot_y) / 2.0
@@ -191,6 +195,17 @@ class PipelineRunner:
     # ------------------------------------------------------------------
     # Internal: spot size management
     # ------------------------------------------------------------------
+
+    def _initial_spot_params(self, default_spot: float) -> Dict[str, float]:
+        """Seed fixed spot-axis values before the first pipeline step."""
+        cfg = self._config
+        spot_x = cfg.spot_x if cfg.spot_x is not None else default_spot
+        spot_y = cfg.spot_y if cfg.spot_y is not None else spot_x
+        return {
+            "spot_x": float(spot_x),
+            "spot_y": float(spot_y),
+            "spot_size": float((spot_x + spot_y) / 2.0),
+        }
 
     @staticmethod
     def _resolve_effective_spot(
@@ -308,9 +323,9 @@ class PipelineRunner:
         if cfg.fit_spot_size is not None:
             specs.append(TargetSpec(name="spot_size", bounds=cfg.fit_spot_size, guess=cfg.spot_size))
         if cfg.fit_spot_x is not None:
-            specs.append(TargetSpec(name="spot_x", bounds=cfg.fit_spot_x, guess=cfg.spot_size))
+            specs.append(TargetSpec(name="spot_x", bounds=cfg.fit_spot_x, guess=cfg.spot_x or cfg.spot_size))
         if cfg.fit_spot_y is not None:
-            specs.append(TargetSpec(name="spot_y", bounds=cfg.fit_spot_y, guess=cfg.spot_size))
+            specs.append(TargetSpec(name="spot_y", bounds=cfg.fit_spot_y, guess=cfg.spot_y or cfg.spot_x or cfg.spot_size))
         # Legacy [[fit.targets]]
         existing = {s.name for s in specs}
         for t in cfg.targets:

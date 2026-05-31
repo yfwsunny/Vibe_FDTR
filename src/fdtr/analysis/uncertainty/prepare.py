@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from fdtr.input.config import FitConfig, UncertaintySpec, to_stack
+from fdtr.input.config import FitConfig, UncertaintySpec, to_fit_targets, to_stack
+from fdtr.input.config.prepare_spot import require_scalar_spot_size
 from fdtr.model.layer import MultilayerStack
 from fdtr.model.param import ResolvedParam, default_parameter_names, get_param_value, resolve
 
@@ -39,6 +40,11 @@ class UncertaintyInputs:
 # ---------------------------------------------------------------------------
 # Parameter resolution
 # ---------------------------------------------------------------------------
+
+def _infer_target_param_names_from_config(config: FitConfig) -> list[str]:
+    """Infer uncertainty targets from fit targets declared in the base config."""
+    return [target.name for target in to_fit_targets(config)]
+
 
 def _merged_known_param_config(
     config: FitConfig,
@@ -94,6 +100,15 @@ def resolve_uncertainty_params(
         target_param_names = list(uncertainty_config.get("target_params", []))
         known_param_overrides = dict(uncertainty_config.get("known_params", {}))
 
+    if not target_param_names:
+        target_param_names = _infer_target_param_names_from_config(config)
+    if not target_param_names:
+        raise ValueError(
+            "uncertainty target_params is empty; provide target_params or set "
+            "fit_* targets in the base config."
+        )
+
+    spot_size_um = require_scalar_spot_size(config, "uncertainty analysis")
     stack = to_stack(config)
     target_params = [resolve(name, stack) for name in target_param_names]
     merged_known = _merged_known_param_config(
@@ -104,7 +119,7 @@ def resolve_uncertainty_params(
 
     known_params = {}
     for param_name, rel_uncertainty in merged_known.items():
-        value = get_param_value(stack, param_name, spot_size_um=config.spot_size or 0.0)
+        value = get_param_value(stack, param_name, spot_size_um=spot_size_um)
         known_params[param_name] = {
             "value": value,
             "uncertainty": rel_uncertainty,

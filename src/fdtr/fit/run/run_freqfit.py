@@ -18,11 +18,20 @@ from fdtr.output.fit_curve_cal import calculate_freq_fit_curve
 from fdtr.output.result_io import save_result
 from fdtr.fit.run.postfit import resolve_fit_output_paths, handle_fit_exit
 from fdtr.input.config.path_resolution import resolve_config_path
+from fdtr.input.config.prepare_spot import (
+    ignored_directional_spot_warning,
+    require_scalar_spot_size,
+)
 
 
 def run_freqfit(config: FitConfig, args=None) -> None:
     """Execute freq-sweep fitting: config -> load data -> fit -> output."""
     signal = SignalType.PHASE if config.signal == "phase" else SignalType.AMPLITUDE
+    spot_size_um = require_scalar_spot_size(config, "freqfit")
+    config.spot_size = spot_size_um
+    spot_warning = ignored_directional_spot_warning(config, "freqfit")
+    if spot_warning:
+        print(f"Warning: {spot_warning}", file=sys.stderr)
     stack = to_stack(config)
     targets = to_fit_targets(config)
 
@@ -64,7 +73,7 @@ def run_freqfit(config: FitConfig, args=None) -> None:
     fitter = FreqFitter(
         stack=stack,
         signal=signal,
-        spot_size_um=config.spot_size,
+        spot_size_um=spot_size_um,
         freq_ranges=freq_ranges,
         n_points=n_points,
     )

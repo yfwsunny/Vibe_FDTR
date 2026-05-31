@@ -55,6 +55,18 @@ def add_init_config_args(parser) -> None:
         default=None,
         help="Beam 1/e2 radius in um (default: 3.0)",
     )
+    mat.add_argument(
+        "--spot-x",
+        type=float,
+        default=None,
+        help="Fixed X-direction beam 1/e2 radius in um",
+    )
+    mat.add_argument(
+        "--spot-y",
+        type=float,
+        default=None,
+        help="Fixed Y-direction beam 1/e2 radius in um",
+    )
 
     strat = parser.add_argument_group("拟合方法与目标")
     strat.add_argument(
@@ -149,7 +161,7 @@ def add_init_config_args(parser) -> None:
         "--pipeline",
         type=str,
         default=None,
-        help="Pipeline name or path (default: 'default' for iterfit)",
+        help="Pipeline reference or path (default: 'builtin:default' for iterfit)",
     )
     pipe.add_argument(
         "--iterations",
@@ -159,12 +171,6 @@ def add_init_config_args(parser) -> None:
     )
 
     out = parser.add_argument_group("输出")
-    out.add_argument(
-        "--output",
-        type=Path,
-        default=None,
-        help="Output file path (default: auto-generates under tasks/)",
-    )
     out.add_argument(
         "--full-template",
         action="store_true",

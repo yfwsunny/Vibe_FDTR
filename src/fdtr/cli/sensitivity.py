@@ -42,10 +42,9 @@ def run_sensitivity(args) -> None:
     config = _load_config(config_path)
     sensitivity = config.sensitivity or SensitivitySpec()
 
-    # Unified path resolution: CLI > [sensitivity] output_dir > [paths] output_dir
+    # Unified path resolution: [sensitivity] output_dir > [paths] output_dir.
     effective_output = (
-        getattr(args, "output_dir", None)
-        or (config.sensitivity.output_dir if config.sensitivity else None)
+        (config.sensitivity.output_dir if config.sensitivity else None)
         or config.output_dir
     )
     out_dir = resolve_output_dir(

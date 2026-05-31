@@ -6,7 +6,7 @@ from .pipeline import (
     load_default_pipeline,
     load_pipeline,
     resolve_pipeline_for_config,
-    save_pipeline,
+    validate_pipeline,
 )
 from .iter_fitter import PipelineResult, PipelineRunner
 
@@ -18,5 +18,5 @@ __all__ = [
     "load_default_pipeline",
     "load_pipeline",
     "resolve_pipeline_for_config",
-    "save_pipeline",
+    "validate_pipeline",
 ]

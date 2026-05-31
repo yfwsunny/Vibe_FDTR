@@ -187,7 +187,7 @@ def apply_fit_fields(
             substrate_fit["Sz"] = (0.6, 60.0)
         tbc_fit["TBC"] = (5e6, 5e8)
         if config.pipeline is None:
-            config.pipeline = "default"
+            config.pipeline = "builtin:default"
 
     # Apply spot overrides
     for prop, bounds in spot_overrides.items():

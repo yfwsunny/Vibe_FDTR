@@ -24,11 +24,11 @@ Use `init-config --analysis sensitivity` from the base config.
 | Parameter                            | Overrides base config? | Notes                                                                                                               |
 | ------------------------------------ | ----------------------:| ------------------------------------------------------------------------------------------------------------------- |
 | `--base-config`                      | —                      | Required. Path to the base config.                                                                                  |
-| `--strategy`                         | yes                    | **ONLY**  `freqfit` or  `offsetfit`. Usually need to override.                                                      |
-| `--signal`                           | yes                    | `phase` by default. Usually keep default unless requested.                                                          |
+| `--strategy`                         | yes                    | **ONLY**  `freqfit` or  `offsetfit`. Usually need to override.                                                      |
+| `--signal`                           | yes                    | `phase` by default. Usually keep default unless requested.                                                          |
 | `--freq-range` / `--offset-range`    | yes                    | To modify, use repeatable `--freq-range "lo,hi"` and `--offset-range "lo,hi"`;                                      |
 | `--phase-points` / `--offset-points` | yes                    | Usually keep default unless requested.                                                                              |
-| `--parameters`                       | no                     | `all` by default. Parameters to calculate the sensitivity curves. Use `Param_INDEX` naming (see parameter-naming) . |
+| `--parameters`                       | no                     | `all` by default. Parameters to calculate the sensitivity curves. Use `Param_INDEX` naming (see CLAUDE.md Index Conventions) . |
 | `--delta`                            | no                     | Usually keep default unless requested.                                                                              |
 
 ## Run sensitivity analysis

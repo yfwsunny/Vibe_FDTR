@@ -21,6 +21,7 @@ def build_fit_config(req: InitConfigRequest) -> FitConfig:
     This is the core generation function. CLI, batch, and Python API
     callers all produce an InitConfigRequest and call this function.
     """
+    pipeline_path = _normalize_pipeline_path(req.pipeline)
     layers = build_layers_from_materials(
         transducer=req.transducer,
         substrate=req.substrate,
@@ -35,7 +36,9 @@ def build_fit_config(req: InitConfigRequest) -> FitConfig:
         layers=layers,
         strategy=req.strategy,
         spot_size=req.spot_size,
-        pipeline=req.pipeline,
+        spot_x=req.spot_x,
+        spot_y=req.spot_y,
+        pipeline=pipeline_path,
     )
 
     fit_params = req.fit_params
@@ -94,14 +97,25 @@ def build_fit_config(req: InitConfigRequest) -> FitConfig:
         cfg.offset_ranges = req.offset_ranges
     elif cfg.offset_ranges is None and _needs_offset:
         cfg.offset_ranges = _auto_offset_ranges(req)
-    if req.pipeline is not None:
-        cfg.pipeline = req.pipeline
+    if pipeline_path is not None:
+        cfg.pipeline = pipeline_path
     if req.iterations != 6:
         cfg.iterations = req.iterations
 
     cfg.report = req.report
 
     return cfg
+
+
+def _normalize_pipeline_path(pipeline: str | None) -> str | None:
+    """Normalize custom pipeline paths for generated configs."""
+    if pipeline is None:
+        return None
+    if pipeline in {"default", "builtin:default"}:
+        return "builtin:default"
+    if pipeline.startswith("builtin:"):
+        return pipeline
+    return Path(pipeline).resolve().as_posix()
 
 
 def _filter_iterfit_fit_params(
@@ -176,8 +190,12 @@ def _iterfit_pipeline_target_names(req: InitConfigRequest, cfg: FitConfig | None
     if cfg is not None:
         pipeline = resolve_pipeline_for_config(cfg)
     else:
-        pipeline_name = req.pipeline or "default"
-        pipeline = load_default_pipeline() if pipeline_name == "default" else load_pipeline(pipeline_name)
+        pipeline_name = _normalize_pipeline_path(req.pipeline) or "builtin:default"
+        pipeline = (
+            load_default_pipeline()
+            if pipeline_name == "builtin:default"
+            else load_pipeline(pipeline_name)
+        )
 
     names: list[str] = []
     seen: set[str] = set()
@@ -292,18 +310,18 @@ def _apply_paths_spec(cfg: FitConfig, req: InitConfigRequest) -> None:
     phase_dir = freq_sweep.get("dir") or freq_sweep.get("directory") or root_dir
 
     if offset_dir is not None:
-        cfg.offset_dir = str(_resolve_spec_path(spec, offset_dir))
+        cfg.offset_dir = _resolve_spec_path(spec, offset_dir).as_posix()
     if offset_dir_y is not None:
-        cfg.offset_dir_y = str(_resolve_spec_path(spec, offset_dir_y))
+        cfg.offset_dir_y = _resolve_spec_path(spec, offset_dir_y).as_posix()
     if phase_dir is not None:
-        cfg.phase_dir = str(_resolve_spec_path(spec, phase_dir))
+        cfg.phase_dir = _resolve_spec_path(spec, phase_dir).as_posix()
     if spec.get("group_key") is not None:
         cfg.group_key = str(spec["group_key"])
 
     if offset_x.get("file") is not None:
-        cfg.data_file = str(offset_x["file"])
+        cfg.data_file = _resolve_spec_path(spec, offset_x["file"]).as_posix()
     if offset_y.get("file") is not None:
-        cfg.data_file_y = str(offset_y["file"])
+        cfg.data_file_y = _resolve_spec_path(spec, offset_y["file"]).as_posix()
 
     if offset_x.get("pattern") is not None:
         cfg.offset_pattern = str(offset_x["pattern"])

@@ -19,7 +19,7 @@ def resolve_fit_output_paths(config, args=None, command: str = "fit") -> OutputP
 
     This is the identical 4-line block that was copy-pasted in every runner.
     """
-    effective_output = config.output_dir or (getattr(args, "output_dir", None) if args else None)
+    effective_output = config.output_dir
     config_path = Path(args.config) if args and hasattr(args, "config") and args.config else None
     out_dir = resolve_output_dir(
         effective_output,

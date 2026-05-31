@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+import logging
 import tomllib
 import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+_VALID_FITTERS = frozenset({"fwhm", "freq", "offset"})
+_VALID_SIGNALS = frozenset({"phase", "amplitude"})
+_VALID_SPOT_KEYS = frozenset({"spot_x", "spot_y", "spot_size", "none"})
+_BUILTIN_PIPELINE_PREFIX = "builtin:"
+_DEFAULT_BUILTIN_PIPELINE = "builtin:default"
 
 
 @dataclass(frozen=True)
@@ -61,11 +76,86 @@ def load_pipeline(path: str | Path) -> PipelineSpec:
     return _from_dict(data)
 
 
-def save_pipeline(spec: PipelineSpec, path: str | Path) -> None:
-    """Write a :class:`PipelineSpec` to a TOML file."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_to_toml_string(spec), encoding="utf-8")
+def validate_pipeline(
+    pipeline: PipelineSpec,
+    datasets: Dict[str, Tuple[np.ndarray, np.ndarray]],
+    stack,
+) -> List[str]:
+    """Validate a :class:`PipelineSpec` against loaded data and layer stack.
+
+    Returns a list of error strings.  An empty list means the pipeline is valid.
+    """
+    from fdtr.model.param import resolve
+
+    errors: list[str] = []
+
+    # Rule 1: minimum steps
+    if len(pipeline.steps) < 2:
+        errors.append(
+            f"Pipeline must have at least 2 steps, got {len(pipeline.steps)}."
+        )
+
+    # Rule 9: convergence_tol
+    if pipeline.convergence_tol <= 0:
+        errors.append("convergence_tol must be positive.")
+
+    available_keys = sorted(datasets.keys())
+
+    for step in pipeline.steps:
+        prefix = f"Step '{step.name}'"
+
+        # Rule 2: required fields
+        if not step.name:
+            errors.append(f"{prefix} is missing required field: name")
+        if not step.fitter:
+            errors.append(f"{prefix} is missing required field: fitter")
+        if not step.data_key:
+            errors.append(f"{prefix} is missing required field: data_key")
+        if not step.target_names:
+            errors.append(f"{prefix} is missing required field: target_names")
+
+        # Rule 3: fitter enum
+        if step.fitter and step.fitter not in _VALID_FITTERS:
+            errors.append(
+                f"{prefix} has unknown fitter '{step.fitter}'. "
+                f"Must be: {', '.join(sorted(_VALID_FITTERS))}"
+            )
+
+        # Rule 4: data_key existence
+        if step.data_key and step.data_key not in datasets:
+            errors.append(
+                f"{prefix} references data_key '{step.data_key}' not found in "
+                f"loaded datasets. Available: {', '.join(available_keys)}"
+            )
+
+        # Rule 5: signal required for freq/offset
+        if step.fitter in ("freq", "offset") and not step.signal:
+            errors.append(
+                f"{prefix} (fitter='{step.fitter}') requires 'signal' to be set."
+            )
+
+        # Rule 6: signal enum
+        if step.signal is not None and step.signal not in _VALID_SIGNALS:
+            errors.append(
+                f"{prefix} has unknown signal '{step.signal}'. "
+                f"Must be: {', '.join(sorted(_VALID_SIGNALS))}"
+            )
+
+        # Rule 7: spot_key enum
+        if step.spot_key and step.spot_key not in _VALID_SPOT_KEYS:
+            errors.append(
+                f"{prefix} has unknown spot_key '{step.spot_key}'. "
+                f"Must be: {', '.join(sorted(_VALID_SPOT_KEYS))}"
+            )
+
+        # Rule 8: target_names vs layer stack
+        for target_name in step.target_names:
+            try:
+                resolve(target_name, stack)
+            except ValueError as exc:
+                errors.append(f"{prefix} has invalid target '{target_name}': {exc}")
+
+    return errors
 
 
 def load_default_pipeline() -> PipelineSpec:
@@ -74,17 +164,42 @@ def load_default_pipeline() -> PipelineSpec:
     return load_pipeline(default_path)
 
 
+def is_builtin_pipeline_reference(value: str | None) -> bool:
+    """Return True when *value* references a built-in pipeline."""
+    return bool(value) and value.startswith(_BUILTIN_PIPELINE_PREFIX)
+
+
+def load_builtin_pipeline(reference: str) -> PipelineSpec:
+    """Load a built-in pipeline from a ``builtin:...`` reference."""
+    if reference == _DEFAULT_BUILTIN_PIPELINE:
+        return load_default_pipeline()
+    if reference == "default":
+        raise ValueError(
+            'pipeline = "default" is no longer supported; use "builtin:default".'
+        )
+    raise ValueError(
+        f"Unknown built-in pipeline '{reference}'. Use 'builtin:default' or a pipeline file path."
+    )
+
+
 def resolve_pipeline_for_config(config) -> PipelineSpec:
     """Resolve a pipeline with target names valid for *config*'s layer symmetry."""
     from fdtr.input.config.config_build import to_stack
     from fdtr.input.config.path_resolution import resolve_config_path
     from fdtr.model.param import resolve
 
-    pipeline_name = getattr(config, "pipeline", None) or "default"
+    pipeline_name = getattr(config, "pipeline", None) or _DEFAULT_BUILTIN_PIPELINE
     stack = to_stack(config)
 
     if pipeline_name == "default":
-        pipeline = _rewrite_default_pipeline_for_symmetry(load_default_pipeline(), stack)
+        raise ValueError(
+            'pipeline = "default" is no longer supported; use "builtin:default".'
+        )
+    if is_builtin_pipeline_reference(pipeline_name):
+        pipeline = _rewrite_default_pipeline_for_symmetry(
+            load_builtin_pipeline(pipeline_name),
+            stack,
+        )
     else:
         pipeline = load_pipeline(resolve_config_path(config, pipeline_name))
 
@@ -123,7 +238,7 @@ def _rewrite_default_pipeline_for_symmetry(
 
 
 # ---------------------------------------------------------------------------
-# Internal: dict <-> dataclass conversion
+# Internal: dict -> dataclass conversion
 # ---------------------------------------------------------------------------
 
 
@@ -158,59 +273,3 @@ def _from_dict(data: dict) -> PipelineSpec:
         steps=steps,
         convergence_tol=data.get("convergence_tol", 1e-4),
     )
-
-
-def _to_toml_string(spec: PipelineSpec) -> str:
-    """Produce a TOML document string from a PipelineSpec."""
-    lines: list[str] = []
-
-    # Header comments
-    lines.append(f"name = {_fmt_str(spec.name)}")
-    lines.append(
-        f"convergence_tol = {repr(spec.convergence_tol)}"
-        "  # relative-change threshold for early stop"
-    )
-    lines.append("")
-    lines.append("# Each [[step]] is one fitting operation. Steps run in order;")
-    lines.append("# the pipeline repeats for config.iterations (or until convergence).")
-
-    _fitter_desc = {
-        "fwhm": "fit beam spot size via FWHM of offset scan",
-        "freq": "fit parameters from frequency-sweep data",
-        "offset": "fit parameters from beam-offset scan",
-    }
-    for step in spec.steps:
-        desc = _fitter_desc.get(step.fitter, "fitting step")
-        lines.append("")
-        lines.append(f"[[step]]  # {desc}")
-        _row(lines, "name", _fmt_str(step.name), "human-readable step label")
-        _row(lines, "fitter", _fmt_str(step.fitter), '"fwhm" | "freq" | "offset"')
-        if step.signal is not None:
-            _row(lines, "signal", _fmt_str(step.signal), '"phase" | "amplitude"')
-        _row(lines, "data_key", _fmt_str(step.data_key), "key in datasets dict")
-        tgt = "[" + ", ".join(_fmt_str(t) for t in step.target_names) + "]"
-        _row(lines, "target_names", tgt, "model parameters to fit")
-        if step.spot_key != "spot_size":
-            _row(lines, "spot_key", _fmt_str(step.spot_key), "which spot-size variable to use")
-        if step.freq_ranges is not None:
-            fr_str = ", ".join(f"[{r[0]}, {r[1]}]" for r in step.freq_ranges)
-            _row(lines, "freq_ranges", f"[{fr_str}]", "Hz — step-level override")
-        if step.offset_ranges is not None:
-            or_str = ", ".join(f"[{r[0]}, {r[1]}]" for r in step.offset_ranges)
-            _row(lines, "offset_ranges", f"[{or_str}]", "um — step-level override")
-        if step.freq_offset is not None:
-            _row(lines, "freq_offset", repr(step.freq_offset), "Hz — step-level override")
-    lines.append("")  # trailing newline
-    return "\n".join(lines)
-
-
-def _row(lines: list[str], key: str, value: str, comment: str) -> None:
-    """Append an aligned key = value  # comment line."""
-    COL = 32  # column where the inline comment starts
-    assignment = f"{key} = {value}"
-    pad = max(1, COL - len(assignment))
-    lines.append(f"{assignment}{' ' * pad}# {comment}")
-
-
-def _fmt_str(s: str) -> str:
-    return f'"{s}"'

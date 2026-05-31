@@ -246,6 +246,8 @@ class FitConfig:
     phase_points: int = 80
     average: bool = True
     spot_size: Optional[float] = None
+    spot_x: Optional[float] = None
+    spot_y: Optional[float] = None
     signal: str = "phase"
     freq_ranges: List[Tuple[float, float]] | None = None
     offset_ranges: list[tuple[float, float]] | None = None
@@ -268,3 +270,4 @@ class FitConfig:
     fit_spot_y: Optional[Tuple[float, float]] = None
     group_key: Optional[str] = None
     source_path: Optional[str] = None
+    analysis_source_path: Optional[str] = None

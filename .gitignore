@@ -4,19 +4,32 @@ __pycache__/
 build/
 dist/
 wheels/
-*.egg-info/
+*.egg-info
 
 # Virtual environments
-.venv/
+.venv
 
-# Runtime output
-tasks/
+# Test / runtime output
 iterfit_*.png
 *.pdf
 test_*.toml
 *_output/
 *_sensitivity/
 
-# OS files
-.DS_Store
+# Pytest cache
+.pytest_cache/
+
+# Claude Code user-specific settings
+.claude/settings.json
+.claude/settings.local.json
+
+# Local git worktrees
+.worktrees/
+.claude/worktrees/
+
+# Development docs (not for release)
+docs/superpowers/
+
+# WSL-specific virtual environment (does not affect Windows .venv)
+.venv-wsl/
 Thumbs.db

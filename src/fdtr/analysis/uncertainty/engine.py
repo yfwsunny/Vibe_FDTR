@@ -20,6 +20,10 @@ from fdtr.analysis.uncertainty.prepare import (
     resolve_uncertainty_params,
 )
 from fdtr.input.config import FitConfig, to_stack
+from fdtr.input.config.prepare_spot import (
+    average_directional_spots,
+    require_scalar_spot_size,
+)
 from fdtr.model.layer import MultilayerStack
 from fdtr.model.param import ResolvedParam, default_parameter_names, get_param_value, resolve
 
@@ -110,7 +114,7 @@ def compute_jacobian(
             f"Use 'freq' or 'offset'."
         )
 
-    spot = config.spot_size or 3.0
+    spot = require_scalar_spot_size(config, "uncertainty analysis")
 
     # Compute baseline signal
     baseline = np.asarray(compute_signal(config, stack, spot, sweep), dtype=float)
@@ -170,7 +174,7 @@ def compute_fwhm_jacobian(
     from fdtr.model.h2d import h2d
 
     stack = to_stack(config)
-    spot = config.spot_size or 3.0
+    spot = require_scalar_spot_size(config, "uncertainty analysis")
     omega = np.atleast_1d(2.0 * np.pi * freq_hz)
 
     def _compute_fwhm(stack_: MultilayerStack, spot_um: float) -> float:
@@ -255,6 +259,7 @@ def run_uncertainty_engine(
     known_param_names = list(known_params.keys())
 
     stack = to_stack(config)
+    spot_size_um = require_scalar_spot_size(config, "uncertainty analysis")
 
     # Compute Jacobian for target parameters
     if analysis_kind == "fwhm":
@@ -292,7 +297,7 @@ def run_uncertainty_engine(
     # Calculate relative uncertainties
     rel_uncertainties = {}
     for i, param in enumerate(target_params):
-        p_val = get_param_value(stack, param.raw_name, spot_size_um=config.spot_size or 0.0)
+        p_val = get_param_value(stack, param.raw_name, spot_size_um=spot_size_um)
         rel_uncertainties[param.raw_name] = np.sqrt(U[i, i]) / p_val
 
     result = UncertaintyResult(
@@ -334,6 +339,16 @@ _FITTER_TO_ANALYSIS_KIND = {
     "offset": "offset",
     "freq": "freq",
 }
+
+
+def _iterfit_scalar_spot(config: FitConfig) -> float:
+    """Return the iterfit average spot without overriding pipeline spot_key."""
+    if config.spot_size is not None:
+        return float(config.spot_size)
+    directional = average_directional_spots(config.spot_x, config.spot_y)
+    if directional is not None:
+        return directional
+    return 3.0
 
 
 def _expand_isotropic_underlying(names: set[str]) -> set[str]:
@@ -381,6 +396,9 @@ def run_iterfit_uncertainty(config) -> dict:
         user_known = dict(uncertainty_config.known_params)
 
     stack = to_stack(fit_config)
+    iterfit_spot_size = _iterfit_scalar_spot(fit_config)
+    if fit_config.spot_size is None:
+        fit_config.spot_size = iterfit_spot_size
     for name in user_known:
         resolve(name, stack)
     pipeline = resolve_pipeline_for_config(fit_config)
@@ -473,7 +491,7 @@ def run_iterfit_uncertainty(config) -> dict:
             # Build covariance matrix from relative uncertainties
             abs_uncs = []
             for kn in known_names:
-                val = get_param_value(stack, kn, spot_size_um=fit_config.spot_size or 0.0)
+                val = get_param_value(stack, kn, spot_size_um=iterfit_spot_size)
                 rel = known_rel[kn]
                 abs_uncs.append(val * rel)
             C = np.diag([u ** 2 for u in abs_uncs])
@@ -483,7 +501,7 @@ def run_iterfit_uncertainty(config) -> dict:
 
             # Store relative uncertainties for this step
             for i, param in enumerate(target_params):
-                p_val = get_param_value(stack, param.raw_name, spot_size_um=fit_config.spot_size or 0.0)
+                p_val = get_param_value(stack, param.raw_name, spot_size_um=iterfit_spot_size)
                 resolved_sigma[param.raw_name] = np.sqrt(U[i, i]) / p_val
 
             # Consolidate spot_x + spot_y -> spot_size

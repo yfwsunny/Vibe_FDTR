@@ -7,30 +7,29 @@ temperature = 295.15              # K, sample temperature used for material look
 
 [[layer]]
 material = "Gold"                 # Material library key. Library values are used unless fields below are explicit.
-rho_cp = 2482947.956055977        # J/m³K, volumetric heat capacity.
-Sr = 317.4258048688991            # W/mK, in-plane thermal conductivity.
-Sz = 317.4258048688991            # W/mK, cross-plane thermal conductivity.
+rho_cp = 2482947.956055977        # J/m^3K, volumetric heat capacity.
+S = 317.4258048688991             # W/mK, isotropic thermal conductivity.
 d = 4.8e-08                       # m, layer thickness.
+fit_S = [100.0, 500.0]             # W/mK, isotropic conductivity fit bounds; use instead of fit_Sr/fit_Sz for S layers.
 fit_d = [3.0e-08, 8.0e-08]        # m, optional fit bounds for layer thickness.
-fit_rho_cp = [2.0e6, 3.0e6]       # J/m³K, optional fit bounds for volumetric heat capacity.
+fit_rho_cp = [2.0e6, 3.0e6]       # J/m^3K, optional fit bounds for volumetric heat capacity.
 
 [[layer]]
 name = "TBC"                      # Interface layer. Use rho_cp = 0.0 and conductance in Sr/Sz.
-rho_cp = 0.0                      # J/m³K, 0.0 marks this as a TBC layer.
-Sr = 50000000.0                   # W/m²K, interface conductance.
-Sz = 50000000.0                   # W/m²K, interface conductance.
+rho_cp = 0.0                      # J/m^3K, 0.0 marks this as a TBC layer.
+Sr = 50000000.0                   # W/m^2K, interface conductance.
+Sz = 50000000.0                   # W/m^2K, interface conductance.
 d = 1.0                           # m, placeholder for TBC layers.
-fit_TBC = [5000000.0, 500000000.0] # W/m²K, TBC fit bounds.
+fit_TBC = [5000000.0, 500000000.0] # W/m^2K, one TBC_N target; do not split into Sr_N/Sz_N.
 
 [[layer]]
 material = "BN"
-rho_cp = 1877762.1993912887       # J/m³K.
+rho_cp = 1877762.1993912887       # J/m^3K.
 Sr = 400.0                        # W/mK.
 Sz = 4.0                          # W/mK.
 d = 1.0e-07                       # m.
 fit_Sr = [50.0, 1000.0]           # W/mK, in-plane conductivity fit bounds.
 fit_Sz = [0.5, 20.0]              # W/mK, cross-plane conductivity fit bounds.
-# To model this layer as isotropic, replace Sr/Sz with S = <value>, then use fit_S.
 
 [[layer]]
 name = "TBC"
@@ -48,7 +47,6 @@ Sz = 5.766995629947655
 d = 1.0                           # m, use 1.0 for a semi-infinite substrate.
 fit_Sr = [100.0, 10000.0]
 fit_Sz = [0.6, 60.0]
-# To model this substrate as isotropic, replace Sr/Sz with S = <value>, then use fit_S.
 
 [paths]
 # Prefer `scan-data --group ... --save` followed by `init-config --paths-spec`.
@@ -68,9 +66,9 @@ output_dir = "results"             # Runtime output directory override.
 
 [fit]
 strategy = "iterfit"               # One of: freqfit, offsetfit, spotfit, iterfit.
-pipeline = "default"               # Iterfit pipeline name or custom pipeline TOML path.
+pipeline = "builtin:default"       # Iterfit built-in ref (builtin:<name>) or custom pipeline TOML path. Pipeline steps can override freq_ranges, offset_ranges, and freq_offset per step.
 signal = "phase"                   # phase or amplitude for supported strategies.
-spot_size = 3.0                    # um, beam 1/e² radius or initial guess.
+spot_size = 3.0                    # um, beam 1/e^2 radius or initial guess.
 fit_spot_size = [0.3, 30.0]        # um, circular spot-size fit bounds.
 fit_spot_x = [0.3, 30.0]           # um, X-direction spot fit bounds.
 fit_spot_y = [0.3, 30.0]           # um, Y-direction spot fit bounds.
@@ -80,17 +78,17 @@ freq_offset = 1194000.0            # Hz, offset-scan frequency used for Sr fitti
 offset_points = 100                # Resampled offset points.
 phase_points = 80                  # Resampled frequency-sweep points.
 average = true                     # Average multiple files before fitting.
-freq_ranges = [[5e4, 2e7]]         # Hz, frequency intervals.
-offset_ranges = [[-15, -5], [5, 15]] # um, offset intervals.
+freq_ranges = [[5e4, 2e7]]         # Hz, frequency intervals. Single-band fits still use a one-element list.
+offset_ranges = [[-15, -5], [5, 15]] # um, multiple offset intervals.
 
 [[fit.targets]]
 name = "Sr_2"                      # Parameter name using 0-based layer indexing.
-bounds = [50.0, 1000.0]            # W/mK, fit bounds for this target.
-guess = 400.0                      # W/mK, optional initial guess.
+bounds = [50.0, 1000.0]            # Fit bounds for this target.
+guess = 400.0                      # Optional initial guess.
 
 [[fit.targets]]
 name = "TBC_1"
-bounds = [5000000.0, 500000000.0]  # W/m²K
+bounds = [5000000.0, 500000000.0]
 
 [sensitivity]
 parameters = ["all"]               # Sensitivity parameters. Use ["all"] or explicit names.

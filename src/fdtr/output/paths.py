@@ -290,6 +290,9 @@ class OutputPaths:
     def uncertainty_result(self, suffix: str = "") -> Path:
         return self._with_suffix("uncertainty_result", ".json", suffix)
 
+    def pipeline(self, suffix: str = "") -> Path:
+        return self._with_suffix("pipeline", ".toml", suffix)
+
     def fit_csv(self, name: str, suffix: str = "") -> Path:
         return self._with_suffix(f"{self.command}fit_{name}", ".csv", suffix)
 
@@ -322,3 +325,6 @@ class OutputPaths:
 
     def next_uncertainty_result_path(self, suffix: str = "") -> Path:
         return self._next(self.uncertainty_result(suffix))
+
+    def next_pipeline_path(self, suffix: str = "") -> Path:
+        return self._next(self.pipeline(suffix))

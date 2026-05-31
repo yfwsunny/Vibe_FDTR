@@ -25,15 +25,11 @@ def _resolve_uncertainty_output_dir(args, config_dict):
     """Resolve output directory for uncertainty results.
 
     Priority:
-      1. --output-dir given -> use it
-      2. --fit-result given -> use its parent directory
-      3. TOML [paths] output_dir -> resolve relative to config
-      4. Auto-generate with material names suffix
+      1. --fit-result given -> use its parent directory
+      2. TOML [paths] output_dir -> resolve relative to config
+      3. Auto-generate with material names suffix
     """
     from fdtr.output import resolve_output_dir, get_material_names_from_dict
-
-    if getattr(args, "output_dir", None):
-        return resolve_output_dir(args.output_dir)
 
     # Use fit result's parent directory when available
     if getattr(args, "fit_result", None):
@@ -206,10 +202,7 @@ def run_uncertainty(args) -> None:
         result = run_engine(config, x_data=x_data)
         print(format_result(result))
 
-        if getattr(args, "output", None):
-            save_result(result, args.output, include_full=include_full)
-            print(f"\nResult saved to {args.output}")
-        elif output_dir:
+        if output_dir:
             out_path = str(paths.next_uncertainty_result_path())
             save_result(result, out_path, include_full=include_full)
             print(f"\nResult saved to {out_path}")

@@ -151,6 +151,14 @@ def _apply_uncertainty_fields(d: dict, args: argparse.Namespace) -> None:
         d["target_params"] = target_params
     elif fit_result is not None:
         d["target_params"] = _infer_target_params_from_fit_result(fit_result)
+    elif "base_config" in d:
+        d["target_params"] = _infer_target_params_from_base_config(d["base_config"])
+
+    if not d.get("target_params"):
+        raise ValueError(
+            "uncertainty target_params is empty; provide --target-params, "
+            "--fit-result, or fit_* targets in --base-config."
+        )
 
     known_params_raw = getattr(args, "known_param", None)
     if known_params_raw:
@@ -182,3 +190,11 @@ def _infer_target_params_from_fit_result(fit_result_path: str) -> list[str]:
     # iterfit: read final_values
     final = data.get("final_values", {})
     return list(final.keys())
+
+
+def _infer_target_params_from_base_config(base_config_path: str) -> list[str]:
+    """Read target names from fit_* declarations in a base config."""
+    from fdtr.input.config import from_toml, to_fit_targets
+
+    cfg = from_toml(base_config_path)
+    return [target.name for target in to_fit_targets(cfg)]

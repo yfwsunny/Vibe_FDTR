@@ -15,6 +15,12 @@ from fdtr.input.config.analysis_template import (
 )
 from fdtr.input.config.config_request import InitConfigRequest
 from fdtr.input.config.config_template import build_fit_config
+from fdtr.input.config.prepare_spot import average_directional_spots
+from fdtr.input.config.unit_check import (
+    UnitCheckError,
+    check_init_config_units,
+    check_uncertainty_known_params,
+)
 
 
 def run_init_config(args) -> None:
@@ -28,14 +34,6 @@ def run_init_config(args) -> None:
     req = _args_to_request(args)
     cfg = build_fit_config(req)
     mode = "full" if req.full_template else "lean"
-
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        to_toml(cfg, args.output, mode=mode)
-        _trim_generated_template(args.output, mode=mode)
-        print(f"Config written to {args.output}")
-        _print_material_summary(cfg)
-        return
 
     from fdtr.output import OutputPaths, get_material_names, resolve_task_root
     from fdtr.output.paths import derive_group_slug
@@ -104,6 +102,32 @@ def _args_to_request(args) -> InitConfigRequest:
     paths_spec = _load_paths_spec(args)
     freq_ranges = parse_ranges(getattr(args, "freq_range", None))
     offset_ranges = parse_ranges(getattr(args, "offset_range", None))
+    try:
+        spot_size, spot_x, spot_y = _resolve_spot_args(
+            getattr(args, "spot_size", None),
+            getattr(args, "spot_x", None),
+            getattr(args, "spot_y", None),
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        check_init_config_units(
+            transducer_thickness=transducer_thickness,
+            layer_thicknesses=layer_thicknesses,
+            spot_size=spot_size,
+            spot_x=spot_x,
+            spot_y=spot_y,
+            freq_offset=getattr(args, "freq_offset", None),
+            freq_spot=getattr(args, "freq_spot", None),
+            freq_ranges=freq_ranges,
+            offset_ranges=offset_ranges,
+            fit_params=fit_params,
+            mode="error",
+        )
+    except UnitCheckError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     return InitConfigRequest(
         transducer=transducer,
@@ -115,7 +139,9 @@ def _args_to_request(args) -> InitConfigRequest:
         temperature=getattr(args, "temperature", 295.15),
         fit_params=fit_params,
         paths_spec=paths_spec,
-        spot_size=getattr(args, "spot_size", None) or 3.0,
+        spot_size=spot_size,
+        spot_x=spot_x,
+        spot_y=spot_y,
         freq_offset=getattr(args, "freq_offset", None) or 1.194e6,
         freq_spot=getattr(args, "freq_spot", None) or 5.0e7,
         signal=getattr(args, "signal", None) or "phase",
@@ -125,9 +151,36 @@ def _args_to_request(args) -> InitConfigRequest:
         offset_ranges=offset_ranges,
         pipeline=getattr(args, "pipeline", None),
         iterations=getattr(args, "iterations", None) or 6,
-        output=getattr(args, "output", None),
         full_template=getattr(args, "full_template", False),
     )
+
+
+def _resolve_spot_args(
+    spot_size: float | None,
+    spot_x: float | None,
+    spot_y: float | None,
+) -> tuple[float, float | None, float | None]:
+    """Resolve init-config spot fields.
+
+    Normal configs should carry only ``spot_size``. Directional fields are
+    emitted only when both axes are provided, which marks an explicit
+    directional spot workflow.
+    """
+    if spot_x is not None and spot_y is not None:
+        avg = average_directional_spots(spot_x, spot_y)
+        if spot_size is not None and abs(float(spot_size) - avg) > 1e-12:
+            raise ValueError(
+                "--spot-size must equal the average of --spot-x and --spot-y "
+                "when directional spot fields are provided."
+            )
+        return avg, spot_x, spot_y
+    if spot_size is not None:
+        return spot_size, None, None
+    if spot_x is not None:
+        return spot_x, None, None
+    if spot_y is not None:
+        return spot_y, None, None
+    return 3.0, None, None
 
 
 def _parse_layer_specs(raw_layers: list[str]) -> tuple[list[str], list[float | None]]:
@@ -161,9 +214,24 @@ def _run_analysis_config(args) -> None:
         sys.exit(1)
 
     d = build_analysis_from_args(args)
+    try:
+        check_init_config_units(
+            spot_size=d.get("spot_size"),
+            spot_x=d.get("spot_x"),
+            spot_y=d.get("spot_y"),
+            freq_offset=d.get("freq_offset"),
+            freq_spot=d.get("freq_spot"),
+            freq_ranges=d.get("freq_ranges"),
+            offset_ranges=d.get("offset_ranges"),
+            mode="error",
+        )
+    except UnitCheckError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    check_uncertainty_known_params(d.get("known_params"), mode="warning")
     toml_str = analysis_dict_to_toml_string(d)
 
-    output = args.output or _default_analysis_output_path(args)
+    output = _default_analysis_output_path(args)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(toml_str, encoding="utf-8")
     print(f"Config written to {output}")

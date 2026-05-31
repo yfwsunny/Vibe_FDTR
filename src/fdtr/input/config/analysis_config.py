@@ -18,6 +18,10 @@ from fdtr.input.config.config_dataclass import (
     normalize_strategy,
 )
 from fdtr.input.config.config_io import from_toml
+from fdtr.input.config.unit_check import (
+    check_fit_config_units,
+    check_uncertainty_known_params,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -37,15 +41,12 @@ _FIT_SCALAR_OVERRIDES: dict[str, type] = {
     "offset_points": int,
     "phase_points": int,
     "spot_size": float,
+    "spot_x": float,
+    "spot_y": float,
 }
 
-_RANGE_KEYS: set[str] = set()
 _RANGES_KEYS = {"freq_ranges", "offset_ranges"}
-
-# Legacy single-tuple key that is automatically promoted to offset_ranges
-_LEGACY_RANGE_KEYS: dict[str, str] = {
-    "offset_range": "offset_ranges",
-}
+_REMOVED_RANGE_KEYS = {"offset_range": "offset_ranges"}
 
 # ---------------------------------------------------------------------------
 # Path-override keys
@@ -129,12 +130,12 @@ def load_analysis_config(path: str | Path, analysis_type: str) -> FitConfig:
             else:
                 setattr(cfg, key, val)
 
-    for key in _RANGE_KEYS:
-        if key in data:
-            val = data[key]
-            if len(val) != 2:
-                raise ValueError(f"'{key}' must be a 2-element array, got {len(val)}")
-            setattr(cfg, key, (val[0], val[1]))
+    for removed_key, replacement in _REMOVED_RANGE_KEYS.items():
+        if removed_key in data:
+            raise ValueError(
+                f"'{removed_key}' is no longer supported. "
+                f"Use '{replacement} = [[lo, hi], ...]' instead."
+            )
 
     for key in _RANGES_KEYS:
         if key in data:
@@ -145,14 +146,6 @@ def load_analysis_config(path: str | Path, analysis_type: str) -> FitConfig:
                     raise ValueError(f"'{key}[{i}]' must be a 2-element array")
                 ranges.append((r[0], r[1]))
             setattr(cfg, key, ranges)
-
-    # Promote legacy single-tuple keys (e.g. offset_range) to list-of-tuples
-    for legacy_key, target_key in _LEGACY_RANGE_KEYS.items():
-        if legacy_key in data and target_key not in data:
-            val = data[legacy_key]
-            if len(val) != 2:
-                raise ValueError(f"'{legacy_key}' must be a 2-element array, got {len(val)}")
-            setattr(cfg, target_key, [(val[0], val[1])])
 
     # Apply path overrides
     for key in _PATH_OVERRIDES:
@@ -174,5 +167,8 @@ def load_analysis_config(path: str | Path, analysis_type: str) -> FitConfig:
             full_output=bool(data.get("full_output", False)),
         )
 
-    cfg.source_path = str(path.resolve())
+    cfg.analysis_source_path = str(path.resolve())
+    check_fit_config_units(cfg, mode="warning")
+    if cfg.uncertainty is not None:
+        check_uncertainty_known_params(cfg.uncertainty.known_params, mode="warning")
     return cfg

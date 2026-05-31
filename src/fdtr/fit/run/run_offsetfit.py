@@ -19,11 +19,20 @@ from fdtr.output.fit_curve_cal import calculate_offset_fit_curve
 from fdtr.output.result_io import save_result
 from fdtr.fit.run.postfit import resolve_fit_output_paths, handle_fit_exit
 from fdtr.input.config.path_resolution import resolve_config_path
+from fdtr.input.config.prepare_spot import (
+    ignored_directional_spot_warning,
+    require_scalar_spot_size,
+)
 
 
 def run_offsetfit(config: FitConfig, args=None) -> None:
     """Execute beam-offset fitting: config -> load data -> fit -> output."""
     signal = SignalType.PHASE if config.signal == "phase" else SignalType.AMPLITUDE
+    spot_size_um = require_scalar_spot_size(config, "offsetfit")
+    config.spot_size = spot_size_um
+    spot_warning = ignored_directional_spot_warning(config, "offsetfit")
+    if spot_warning:
+        print(f"Warning: {spot_warning}", file=sys.stderr)
     stack = to_stack(config)
     targets = to_fit_targets(config)
 
@@ -84,7 +93,7 @@ def run_offsetfit(config: FitConfig, args=None) -> None:
     sr_guess = next((t.initial_guess * t.scale for t in targets if "Sr" in t.name), None)
     print(f"Data source:         {config.offset_dir or config.data_file}")
     print(f"Requested freq:      {freq} Hz, using harmonic: {actual_freq} Hz")
-    print(f"Spot size:           {config.spot_size} um")
+    print(f"Spot size:           {spot_size_um} um")
     if sr_guess is not None:
         print(f"Sr initial guess:   {sr_guess} W/mK")
     print(f"Signal:              {signal.value}")
@@ -99,7 +108,7 @@ def run_offsetfit(config: FitConfig, args=None) -> None:
         stack=stack,
         signal=signal,
         freq=actual_freq,
-        spot_size_um=config.spot_size,
+        spot_size_um=spot_size_um,
         offset_ranges=offset_ranges,
         n_points=config.offset_points,
     )

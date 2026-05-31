@@ -17,8 +17,6 @@ def run_fit(args) -> None:
     config_path = args.config
 
     config = from_toml(config_path)
-    if getattr(args, "output_dir", None):
-        config.output_dir = args.output_dir
 
     dispatch = {
         "freqfit": run_freqfit,

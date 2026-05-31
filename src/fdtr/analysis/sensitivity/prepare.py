@@ -12,6 +12,7 @@ from typing import Sequence
 import numpy as np
 
 from fdtr.input.config import FitConfig, SensitivitySpec, to_stack
+from fdtr.input.config.prepare_spot import require_scalar_spot_size
 from fdtr.model.h2d import h2d
 from fdtr.model.layer import MultilayerStack
 from fdtr.model.param import ResolvedParam, default_parameter_names, resolve
@@ -154,15 +155,14 @@ def prepare_sensitivity(config: FitConfig) -> SensitivityInputs:
     """
     sensitivity = config.sensitivity or SensitivitySpec()
 
-    if config.spot_size is None:
-        raise ValueError("Sensitivity analysis requires config.spot_size to be set.")
+    spot_size_um = require_scalar_spot_size(config, "sensitivity analysis")
     if not (0.0 < sensitivity.delta < 1.0):
         raise ValueError("Sensitivity delta must satisfy 0.0 < delta < 1.0.")
 
     stack = to_stack(config)
     params = resolve_sensitivity_params(sensitivity.parameters, stack)
     sweep = build_sweep_spec(config)
-    baseline = np.asarray(compute_signal(config, stack, config.spot_size, sweep), dtype=float)
+    baseline = np.asarray(compute_signal(config, stack, spot_size_um, sweep), dtype=float)
 
     return SensitivityInputs(
         stack=stack,
@@ -170,7 +170,7 @@ def prepare_sensitivity(config: FitConfig) -> SensitivityInputs:
         sweep=sweep,
         baseline=baseline,
         delta=sensitivity.delta,
-        spot_size_um=config.spot_size,
+        spot_size_um=spot_size_um,
     )
 
 
