@@ -1,0 +1,11 @@
+---
+source: "Data source: Corning Data Sheet (https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&ved=2ahUKEwjHwu7f0JviAhVKTd8KHaYDDwYQFjAAegQIBRAC&url=https%3A%2F%2Fwww.corning.com%2Fmedia%2Fworldwide%2Fcdt%2Fdocuments%2FEAGLE%2520XG%2520%25C2%25AE%2520Slim%2520Glass.pdf&usg=AOvVaw0J0u6XwsEpiot3z0Nwqwvk)"
+---
+
+T (K)	rho_cp (J/m³K)	S (W/mK)
+2.9615000e+02	1.8136000e+06	1.0900000e+00
+3.7315000e+02	2.1329000e+06	1.2200000e+00
+4.7315000e+02	2.3626000e+06	1.2900000e+00
+5.7315000e+02	2.5283000e+06	1.3400000e+00
+6.7315000e+02	2.6245000e+06	1.3700000e+00
+7.7315000e+02	2.7413000e+06	1.4200000e+00

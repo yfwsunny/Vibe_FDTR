@@ -1,0 +1,7 @@
+---
+source: "Single crystal quartz. Data source: Lienhard"
+---
+
+T (K)	rho_cp (J/m³K)	Sz (W/mK)	Sr (W/mK)
+2.9000000e+02	1.9615200e+06	1.0800000e+01	6.2100000e+00
+3.1000000e+02	1.9615200e+06	1.0800000e+01	6.2100000e+00

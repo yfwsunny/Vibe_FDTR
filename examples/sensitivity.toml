@@ -1,0 +1,5 @@
+base_config = "iterfit.toml"
+strategy = "freqfit"
+freq_ranges = [[50000.0, 20000000.0]]
+parameters = ["all"]
+delta = 1e-4

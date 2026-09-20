@@ -1,0 +1,35 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Test / runtime output
+iterfit_*.png
+*.pdf
+test_*.toml
+*_output/
+*_sensitivity/
+
+# Pytest cache
+.pytest_cache/
+
+# Claude Code user-specific settings
+.claude/settings.json
+.claude/settings.local.json
+
+# Local git worktrees
+.worktrees/
+.claude/worktrees/
+
+# Development docs (not for release)
+docs/superpowers/
+
+# WSL-specific virtual environment (does not affect Windows .venv)
+.venv-wsl/
+Thumbs.db

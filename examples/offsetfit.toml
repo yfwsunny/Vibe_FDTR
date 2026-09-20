@@ -1,0 +1,31 @@
+temperature = 295.15
+
+[[layer]]
+material = "Gold"
+rho_cp = 2482947.956055977
+S = 317.4258048688991
+d = 4.8e-08
+
+[[layer]]
+name = "TBC"
+rho_cp = 0.0
+Sr = 50000000.0
+Sz = 50000000.0
+d = 1.0
+
+[[layer]]
+material = "Graphite"
+rho_cp = 1581191.3332213643
+Sr = 1727.7234719799992
+Sz = 5.766995629947655
+d = 1.0
+fit_Sr = [100.0, 10000.0]
+
+[fit]
+strategy = "offsetfit"
+spot_size = 3.0
+iterations = 6
+freq_spot = 50000000.0
+freq_offset = 1194000.0
+offset_points = 100
+phase_points = 80
